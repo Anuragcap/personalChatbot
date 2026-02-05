@@ -5,7 +5,8 @@ import app
 import tempfile
 
 class Token:
-    def __init__(self, token): self.token = token
+    def __init__(self, token): 
+        self.token = token
 
 def test_api_requires_token():
     """Test that API mode requires authentication"""
@@ -26,6 +27,7 @@ def test_api_requires_token():
     first = next(gen)
     assert "please log in" not in first.lower()
     assert isinstance(first, str)
+    assert len(first) > 0
 
 def test_file_context_extraction():
     """Test that file content is properly extracted"""

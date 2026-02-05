@@ -2,38 +2,8 @@ import gradio as gr
 from huggingface_hub import InferenceClient
 import os
 import time
-from datetime import datetime
 
 pipe = None
-stop_inference = False
-
-# Fancy styling
-fancy_css = """
-#main-container {
-    background-color: #f0f0f0;
-    font-family: 'Arial', sans-serif;
-}
-.gradio-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 20px;
-    background: white;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
-.gr-button {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    padding: 10px 20px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-.gr-button:hover {
-    background-color: #45a049;
-}
-"""
 
 def extract_text_from_file(file):
     """Extract text content from uploaded file"""
@@ -48,7 +18,7 @@ def extract_text_from_file(file):
                 content = f.read()
                 return f"\n\n[Context from file: {os.path.basename(file_path)}]\n{content}\n[End of file context]\n"
         else:
-            return f"\n\n[File uploaded: {os.path.basename(file_path)} - content extraction not supported for this file type]\n"
+            return f"\n\n[File uploaded: {os.path.basename(file_path)}]\n"
     
     except Exception as e:
         return f"\n\n[Error reading file: {str(e)}]\n"
@@ -56,7 +26,7 @@ def extract_text_from_file(file):
 
 def respond(
     message,
-    history: list[dict[str, str]],
+    history,
     system_message,
     max_tokens,
     temperature,
@@ -73,7 +43,13 @@ def respond(
     enhanced_message = file_context + message if file_context else message
 
     messages = [{"role": "system", "content": system_message}]
-    messages.extend(history)
+    
+    # Convert history to proper format
+    for user_msg, bot_msg in history:
+        messages.append({"role": "user", "content": user_msg})
+        if bot_msg:
+            messages.append({"role": "assistant", "content": bot_msg})
+    
     messages.append({"role": "user", "content": enhanced_message})
 
     response = ""
@@ -81,7 +57,6 @@ def respond(
     if use_local_model:
         print("[MODE] local")
         from transformers import pipeline
-        import torch
         if pipe is None:
             pipe = pipeline("text-generation", model="microsoft/Phi-3-mini-4k-instruct")
 
@@ -132,7 +107,16 @@ def respond(
         yield response_with_time
 
 
-with gr.Blocks(css=fancy_css) as demo:
+# Fancy CSS
+fancy_css = """
+.gradio-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+"""
+
+# Create the Gradio interface
+with gr.Blocks() as demo:
     with gr.Row():
         gr.Markdown("<h1 style='text-align: center;'>🌟 Enhanced AI Chatbot 🌟</h1>")
         gr.LoginButton()
@@ -144,115 +128,71 @@ with gr.Blocks(css=fancy_css) as demo:
     - 🤖 Choose between API and Local model execution
     """)
     
+    chatbot = gr.Chatbot(label="Chat", height=500)
+    
     with gr.Row():
-        with gr.Column(scale=3):
-            chatbot = gr.Chatbot(
-                label="Chat",
-                type="messages",
-                height=500,
-            )
-            
-            with gr.Row():
-                msg = gr.Textbox(
-                    label="Your Message",
-                    placeholder="Type your message here...",
-                    scale=4,
-                )
-                file_upload = gr.File(
-                    label="Upload Context File (optional)",
-                    file_types=[".txt", ".md", ".py", ".json", ".csv"],
-                    scale=1,
-                )
-            
-            with gr.Row():
-                submit_btn = gr.Button("Send", variant="primary")
-                clear_btn = gr.ClearButton([msg, chatbot])
-        
-        with gr.Column(scale=1):
-            gr.Markdown("### ⚙️ Settings")
-            
-            system_message = gr.Textbox(
-                value="You are a friendly and helpful AI assistant.",
-                label="System Message",
-                lines=3,
-            )
-            
-            max_tokens = gr.Slider(
-                minimum=1,
-                maximum=2048,
-                value=512,
-                step=1,
-                label="Max New Tokens",
-            )
-            
-            temperature = gr.Slider(
-                minimum=0.1,
-                maximum=2.0,
-                value=0.7,
-                step=0.1,
-                label="Temperature",
-            )
-            
-            top_p = gr.Slider(
-                minimum=0.1,
-                maximum=1.0,
-                value=0.95,
-                step=0.05,
-                label="Top-p",
-            )
-            
-            use_local_model = gr.Checkbox(
-                label="Use Local Model",
-                value=False,
-            )
+        msg = gr.Textbox(
+            label="Your Message",
+            placeholder="Type your message here...",
+            scale=4,
+        )
+        file_upload = gr.File(
+            label="Upload File",
+            file_types=[".txt", ".md", ".py", ".json", ".csv"],
+            scale=1,
+        )
     
-    def user_submit(message, history, file):
-        if not message.strip():
-            return "", history, file
-        return "", history + [{"role": "user", "content": message}], file
+    with gr.Row():
+        submit_btn = gr.Button("Send", variant="primary")
+        clear_btn = gr.ClearButton([msg, chatbot])
     
-    def bot_response(history, system_msg, max_tok, temp, top_p_val, hf_token, use_local, file):
-        if not history:
-            return history
-        
-        user_message = history[-1]["content"]
-        
-        generator = respond(
-            message=user_message,
-            history=history[:-1],
-            system_message=system_msg,
-            max_tokens=max_tok,
-            temperature=temp,
-            top_p=top_p_val,
-            hf_token=hf_token,
-            use_local_model=use_local,
-            uploaded_file=file,
+    with gr.Accordion("⚙️ Settings", open=False):
+        system_message = gr.Textbox(
+            value="You are a friendly and helpful AI assistant.",
+            label="System Message",
+            lines=3,
         )
         
-        for response_text in generator:
-            history[-1] = {"role": "user", "content": user_message}
-            yield history + [{"role": "assistant", "content": response_text}]
+        max_tokens = gr.Slider(
+            minimum=1,
+            maximum=2048,
+            value=512,
+            step=1,
+            label="Max New Tokens",
+        )
+        
+        temperature = gr.Slider(
+            minimum=0.1,
+            maximum=2.0,
+            value=0.7,
+            step=0.1,
+            label="Temperature",
+        )
+        
+        top_p = gr.Slider(
+            minimum=0.1,
+            maximum=1.0,
+            value=0.95,
+            step=0.05,
+            label="Top-p",
+        )
+        
+        use_local_model = gr.Checkbox(
+            label="Use Local Model",
+            value=False,
+        )
     
+    # Event handlers
     msg.submit(
-        user_submit,
-        [msg, chatbot, file_upload],
-        [msg, chatbot, file_upload],
-        queue=False,
-    ).then(
-        bot_response,
-        [chatbot, system_message, max_tokens, temperature, top_p, gr.State(), use_local_model, file_upload],
-        chatbot,
+        respond,
+        [msg, chatbot, system_message, max_tokens, temperature, top_p, gr.State(), use_local_model, file_upload],
+        [chatbot],
     )
     
     submit_btn.click(
-        user_submit,
-        [msg, chatbot, file_upload],
-        [msg, chatbot, file_upload],
-        queue=False,
-    ).then(
-        bot_response,
-        [chatbot, system_message, max_tokens, temperature, top_p, gr.State(), use_local_model, file_upload],
-        chatbot,
+        respond,
+        [msg, chatbot, system_message, max_tokens, temperature, top_p, gr.State(), use_local_model, file_upload],
+        [chatbot],
     )
 
 if __name__ == "__main__":
