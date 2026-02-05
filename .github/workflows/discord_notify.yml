@@ -1,55 +1,13 @@
-cat > .github/workflows/discord_notify.yml << 'EOF'
-name: Discord Notification on Sync
+name: Discord Notification
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Send Discord notification with embed
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          COMMIT_MSG="${GITHUB_EVENT_HEAD_COMMIT_MESSAGE:-Manual workflow trigger}"
-          COMMIT_SHA="${GITHUB_SHA:0:7}"
-          AUTHOR="${GITHUB_ACTOR}"
-          
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{
-            \"embeds\": [{
-              \"title\": \"🚀 New Deployment to Hugging Face\",
-              \"description\": \"A new commit was pushed and synced to Hugging Face Space!\",
-              \"color\": 5814783,
-              \"fields\": [
-                {
-                  \"name\": \"👤 Author\",
-                  \"value\": \"$AUTHOR\",
-                  \"inline\": true
-                },
-                {
-                  \"name\": \"📝 Commit\",
-                  \"value\": \"\`$COMMIT_SHA\`\",
-                  \"inline\": true
-                },
-                {
-                  \"name\": \"🔗 Repository\",
-                  \"value\": \"[View on GitHub]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY)\"
-                }
-              ],
-              \"footer\": {
-                \"text\": \"Enhanced Chatbot with File Upload & Response Time Tracking\"
-              },
-              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
-            }]
-          }" \
-          $DISCORD_WEBHOOK_URL || echo "Discord webhook not configured or failed"
-EOF
+      - name: Send notification
+        run: echo "Workflow completed"
