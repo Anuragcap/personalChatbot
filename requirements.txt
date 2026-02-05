@@ -1,0 +1,4 @@
+gradio[oauth]
+transformers
+torch
+huggingface_hub
