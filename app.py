@@ -31,12 +31,9 @@ def respond(
     max_tokens,
     temperature,
     top_p,
-    hf_token: gr.OAuthToken,
-    use_local_model: bool,
+    use_local_model,
     uploaded_file,
 ):
-    global pipe
-    
     start_time = time.time()
 
     file_context = extract_text_from_file(uploaded_file) if uploaded_file else ""
@@ -57,6 +54,7 @@ def respond(
     if use_local_model:
         print("[MODE] local")
         from transformers import pipeline
+        global pipe
         if pipe is None:
             pipe = pipeline("text-generation", model="microsoft/Phi-3-mini-4k-instruct")
 
@@ -79,54 +77,55 @@ def respond(
 
     else:
         print("[MODE] api")
-
-        if hf_token is None or not getattr(hf_token, "token", None):
-            yield "⚠️ Please log in with your Hugging Face account first."
+        
+        # Get OAuth token from Gradio context
+        request = gr.Request()
+        hf_token = None
+        
+        try:
+            if hasattr(request, 'username') and request.username:
+                # User is logged in via OAuth
+                from huggingface_hub import whoami
+                hf_token = request.kwargs.get('token')
+        except:
+            pass
+        
+        if not hf_token:
+            yield "⚠️ Please log in with your Hugging Face account first (click the login button at the top)."
             return
 
-        client = InferenceClient(token=hf_token.token, model="meta-llama/Llama-3.2-3B-Instruct")
+        try:
+            client = InferenceClient(token=hf_token, model="meta-llama/Llama-3.2-3B-Instruct")
 
-        for chunk in client.chat_completion(
-            messages,
-            max_tokens=max_tokens,
-            stream=True,
-            temperature=temperature,
-            top_p=top_p,
-        ):
-            choices = chunk.choices
-            token = ""
-            if len(choices) and choices[0].delta.content:
-                token = choices[0].delta.content
-            response += token
-            yield response
-        
-        end_time = time.time()
-        response_time = end_time - start_time
-        
-        response_with_time = f"{response}\n\n⏱️ *Response time: {response_time:.2f}s (API Model)*"
-        yield response_with_time
+            for chunk in client.chat_completion(
+                messages,
+                max_tokens=max_tokens,
+                stream=True,
+                temperature=temperature,
+                top_p=top_p,
+            ):
+                choices = chunk.choices
+                token = ""
+                if len(choices) and choices[0].delta.content:
+                    token = choices[0].delta.content
+                response += token
+                yield response
+            
+            end_time = time.time()
+            response_time = end_time - start_time
+            
+            response_with_time = f"{response}\n\n⏱️ *Response time: {response_time:.2f}s (API Model)*"
+            yield response_with_time
+        except Exception as e:
+            yield f"⚠️ Error with API: {str(e)}. Please make sure you're logged in with Hugging Face."
 
-
-# Fancy CSS
-fancy_css = """
-.gradio-container {
-    max-width: 900px;
-    margin: 0 auto;
-}
-"""
 
 # Create the Gradio interface
-with gr.Blocks() as demo:
-    with gr.Row():
-        gr.Markdown("<h1 style='text-align: center;'>🌟 Enhanced AI Chatbot 🌟</h1>")
-        gr.LoginButton()
+with gr.Blocks(title="PersonalChatbot") as demo:
+    gr.Markdown("<h1 style='text-align: center;'>for your second guesses</h1>")
     
-    gr.Markdown("""
-    ### Features:
-    - 📁 Upload files (.txt, .md, .py, .json, .csv) to provide context
-    - ⏱️ Response time tracking for performance comparison
-    - 🤖 Choose between API and Local model execution
-    """)
+
+    gr.LoginButton()
     
     chatbot = gr.Chatbot(label="Chat", height=500)
     
@@ -178,20 +177,20 @@ with gr.Blocks() as demo:
         )
         
         use_local_model = gr.Checkbox(
-            label="Use Local Model",
+            label="Use Local Model (runs on Space hardware)",
             value=False,
         )
     
     # Event handlers
     msg.submit(
         respond,
-        [msg, chatbot, system_message, max_tokens, temperature, top_p, gr.State(), use_local_model, file_upload],
+        [msg, chatbot, system_message, max_tokens, temperature, top_p, use_local_model, file_upload],
         [chatbot],
     )
     
     submit_btn.click(
         respond,
-        [msg, chatbot, system_message, max_tokens, temperature, top_p, gr.State(), use_local_model, file_upload],
+        [msg, chatbot, system_message, max_tokens, temperature, top_p, use_local_model, file_upload],
         [chatbot],
     )
 
