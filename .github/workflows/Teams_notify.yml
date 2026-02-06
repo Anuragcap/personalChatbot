@@ -1,0 +1,53 @@
+name: Teams Notification
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Send Teams notification
+        env:
+          TEAMS_WEBHOOK: ${{ secrets.TEAMS_WEBHOOK }}
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_AUTHOR="${{ github.actor }}"
+          REPO_NAME="${{ github.repository }}"
+          COMMIT_URL="${{ github.event.head_commit.url }}"
+          
+          curl -H 'Content-Type: application/json' \
+               -d '{
+                 "@type": "MessageCard",
+                 "@context": "https://schema.org/extensions",
+                 "summary": "New Push to Chatbot",
+                 "themeColor": "0078D4",
+                 "title": "✅ New Push to personalChatbot",
+                 "sections": [{
+                   "activityTitle": "'"$COMMIT_AUTHOR"' pushed to main",
+                   "activitySubtitle": "'"$REPO_NAME"'",
+                   "facts": [{
+                     "name": "Commit Message:",
+                     "value": "'"$COMMIT_MSG"'"
+                   }, {
+                     "name": "Branch:",
+                     "value": "main"
+                   }],
+                   "markdown": true
+                 }],
+                 "potentialAction": [{
+                   "@type": "OpenUri",
+                   "name": "View Commit",
+                   "targets": [{
+                     "os": "default",
+                     "uri": "'"$COMMIT_URL"'"
+                   }]
+                 }]
+               }' \
+               $TEAMS_WEBHOOK
