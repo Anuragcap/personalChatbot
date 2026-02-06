@@ -67,7 +67,7 @@ def extract_text_from_file(file):
 
 def respond(
     message,
-    history: list[dict[str, str]],
+    history,
     system_message,
     max_tokens,
     temperature,
@@ -82,9 +82,14 @@ def respond(
     # Extract file context if provided
     file_context = extract_text_from_file(file_upload)
     
-    # Build messages from history
+    # Build messages for API
     messages = [{"role": "system", "content": system_message}]
-    messages.extend(history)
+    
+    # Add history - convert from ChatInterface format
+    for user_msg, bot_msg in history:
+        messages.append({"role": "user", "content": user_msg})
+        if bot_msg:
+            messages.append({"role": "assistant", "content": bot_msg})
     
     # Add current message with file context
     full_message = file_context + message if file_context else message
@@ -159,7 +164,6 @@ chatbot = gr.ChatInterface(
         ),
         gr.Checkbox(label="Use Local Model", value=False),
     ],
-    type="messages",
 )
 
 with gr.Blocks(css=fancy_css) as demo:
