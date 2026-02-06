@@ -117,5 +117,5 @@ def test_api_requires_token():
         use_local_model=False,
     )
     first = next(gen)
-    assert "please log in" not in first.lower()  # shouldn't get warning
+    assert "please log in" not in first.lower()  # Should not get auth error with valid token
     assert isinstance(first, str)
