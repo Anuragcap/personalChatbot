@@ -17,7 +17,7 @@ fancy_css = """
     max-width: 700px;
     margin: 0 auto;
     padding: 20px;
-    background: #0093E9
+    background: #00CED1;
     box-shadow: 0 8px 32px rgba(0, 147, 233, 0.2);
     border-radius: 15px;
 }
