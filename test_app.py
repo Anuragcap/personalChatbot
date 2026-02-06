@@ -4,6 +4,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import app
 import tempfile
 
+class Token:
+    def __init__(self, token):
+        self.token = token
+
 def test_file_context_extraction():
     """Test that file content is properly extracted"""
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -46,6 +50,7 @@ def test_respond_function_exists():
     # Should have at least message and history parameters
     assert 'message' in params
     assert 'history' in params
+    assert 'file_upload' in params
     assert len(params) >= 2
 
 def test_chatinterface_demo_exists():
@@ -55,9 +60,21 @@ def test_chatinterface_demo_exists():
     
 def test_respond_returns_generator():
     """Test that respond returns a generator"""
+    hf_token = os.environ.get("HF_TOKEN")
+    
+    # Create a mock token or None if not available
+    token_obj = Token(hf_token) if hf_token else None
+    
     gen = app.respond(
         message="Test message",
         history=[],
+        system_message="You are a helpful assistant",
+        max_tokens=10,
+        temperature=0.7,
+        top_p=0.9,
+        file_upload=None,
+        hf_token=token_obj,
+        use_local_model=False,
     )
     
     # Should return a generator
@@ -74,7 +91,31 @@ def test_respond_returns_generator():
         print("✓ Generator created successfully")
     except Exception as e:
         # API errors are expected in CI without proper auth
-        if "Error" in str(e) or "API" in str(e):
-            print(f"✓ Expected API error in CI: {str(e)[:50]}")
+        error_str = str(e)
+        if "log in" in error_str.lower() or "token" in error_str.lower():
+            print(f"✓ Expected auth warning in CI: {error_str[:50]}")
         else:
             raise
+
+def test_api_requires_token():
+    """Test API mode with valid token"""
+    hf_token = os.environ.get("HF_TOKEN")
+    
+    if not hf_token:
+        print("⚠️ Skipping test_api_requires_token - HF_TOKEN not set")
+        return
+    
+    gen = app.respond(
+        message="Hi",
+        history=[],
+        system_message="test",
+        max_tokens=8,
+        temperature=0.2,
+        top_p=0.9,
+        file_upload=None,
+        hf_token=Token(hf_token),
+        use_local_model=False,
+    )
+    first = next(gen)
+    assert "please log in" not in first.lower()  # shouldn't get warning
+    assert isinstance(first, str)
