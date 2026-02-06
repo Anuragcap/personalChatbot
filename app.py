@@ -9,7 +9,7 @@ stop_inference = False
 
 fancy_css = """
 #main-container {
-    background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
+    background-color: #0f766e;  /* Dark teal */
     font-family: 'Arial', sans-serif;
     min-height: 100vh;
 }
