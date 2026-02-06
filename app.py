@@ -6,34 +6,36 @@ import time
 pipe = None
 stop_inference = False
 
-# Fancy styling
+
 fancy_css = """
 #main-container {
-    background-color: #f0f0f0;
+    background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
     font-family: 'Arial', sans-serif;
+    min-height: 100vh;
 }
 .gradio-container {
     max-width: 700px;
     margin: 0 auto;
     padding: 20px;
-    background: white;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.93);
+    box-shadow: 0 8px 32px rgba(0, 147, 233, 0.2);
+    border-radius: 15px;
 }
 .gr-button {
-    background-color: #4CAF50;
+    background: linear-gradient(135deg, #0093E9 0%, #80D0C7 100%);
     color: white;
     border: none;
     border-radius: 5px;
     padding: 10px 20px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s ease;
 }
 .gr-button:hover {
-    background-color: #45a049;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 147, 233, 0.3);
 }
 .gr-slider input {
-    color: #4CAF50;
+    color: #0093E9;
 }
 .gr-chat {
     font-size: 16px;
