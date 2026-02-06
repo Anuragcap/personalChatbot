@@ -166,7 +166,7 @@ chatbot = gr.ChatInterface(
     ],
 )
 
-with gr.Blocks(css=fancy_css) as demo:
+with gr.Blocks() as demo:
     with gr.Row():
         gr.Markdown("<h1 style='text-align: center;'>🌟 Fancy AI Chatbot 🌟</h1>")
         gr.LoginButton()
@@ -182,4 +182,4 @@ with gr.Blocks(css=fancy_css) as demo:
     chatbot.render()
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(css=fancy_css)  # CSS moved here for Gradio 6.0
