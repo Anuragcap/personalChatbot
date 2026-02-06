@@ -85,11 +85,19 @@ def respond(
     # Build messages for API
     messages = [{"role": "system", "content": system_message}]
     
-    # Add history - convert from ChatInterface format
-    for user_msg, bot_msg in history:
-        messages.append({"role": "user", "content": user_msg})
-        if bot_msg:
-            messages.append({"role": "assistant", "content": bot_msg})
+    # Add history - handle both list of dicts and list of tuples
+    if history:
+        # Check if history is a list of dicts (new format) or list of tuples (old format)
+        if isinstance(history[0], dict):
+            # New format: list of dicts with 'role' and 'content'
+            for msg in history:
+                messages.append(msg)
+        else:
+            # Old format: list of tuples [(user_msg, bot_msg), ...]
+            for user_msg, bot_msg in history:
+                messages.append({"role": "user", "content": user_msg})
+                if bot_msg:
+                    messages.append({"role": "assistant", "content": bot_msg})
     
     # Add current message with file context
     full_message = file_context + message if file_context else message
@@ -131,24 +139,27 @@ def respond(
         
         client = InferenceClient(token=hf_token.token, model="meta-llama/Llama-3.2-3B-Instruct")
         
-        for chunk in client.chat_completion(
-            messages,
-            max_tokens=max_tokens,
-            stream=True,
-            temperature=temperature,
-            top_p=top_p,
-        ):
-            choices = chunk.choices
-            token = ""
-            if len(choices) and choices[0].delta.content:
-                token = choices[0].delta.content
-            response += token
-            yield response
-        
-        # Add response time
-        end_time = time.time()
-        response_time = end_time - start_time
-        yield f"{response}\n\n⏱️ *Response time: {response_time:.2f}s*"
+        try:
+            for chunk in client.chat_completion(
+                messages,
+                max_tokens=max_tokens,
+                stream=True,
+                temperature=temperature,
+                top_p=top_p,
+            ):
+                choices = chunk.choices
+                token = ""
+                if len(choices) and choices[0].delta.content:
+                    token = choices[0].delta.content
+                response += token
+                yield response
+            
+            # Add response time
+            end_time = time.time()
+            response_time = end_time - start_time
+            yield f"{response}\n\n⏱️ *Response time: {response_time:.2f}s*"
+        except Exception as e:
+            yield f"Error: {str(e)}\n\nPlease try again."
 
 
 chatbot = gr.ChatInterface(
@@ -171,15 +182,9 @@ with gr.Blocks() as demo:
         gr.Markdown("<h1 style='text-align: center;'>🌟 Fancy AI Chatbot 🌟</h1>")
         gr.LoginButton()
     
-    gr.Markdown("""
-    ### Features:
-    - 💬 Chat with AI assistant
-    - 📁 **Upload files for context** (.txt, .md, .py, .json, .csv)
-    - ⏱️ Response time tracking
-    - 🚀 Powered by Llama 3.2 or local Phi-3
-    """)
+    
     
     chatbot.render()
 
 if __name__ == "__main__":
-    demo.launch(css=fancy_css)  # CSS moved here for Gradio 6.0
+    demo.launch(css=fancy_css)
