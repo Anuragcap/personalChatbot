@@ -3,8 +3,6 @@ from huggingface_hub import InferenceClient
 import os
 import time
 
-pipe = None
-
 def extract_text_from_file(file):
     """Extract text content from uploaded file"""
     if file is None:
@@ -24,9 +22,28 @@ def extract_text_from_file(file):
         return f"\n\n[Error reading file: {str(e)}]\n"
 
 
-def respond(message, history):
+def respond(message, history, request: gr.Request):
     """Simple chatbot response function"""
     start_time = time.time()
+    
+    # Get OAuth token from request
+    token = None
+    if request:
+        try:
+            token = request.headers.get("authorization", "").replace("Bearer ", "")
+            if not token and hasattr(request, "username"):
+                # Try to get from OAuth
+                token = request.oauth_token if hasattr(request, "oauth_token") else None
+        except:
+            pass
+    
+    # Fallback to environment variable
+    if not token:
+        token = os.getenv("HF_TOKEN")
+    
+    if not token:
+        yield "⚠️ Please log in with Hugging Face to use this chatbot. Click the 'Sign in with Hugging Face' button above."
+        return
     
     # Build messages for API
     messages = [{"role": "system", "content": "You are a friendly and helpful AI assistant."}]
@@ -42,7 +59,7 @@ def respond(message, history):
     
     # Use InferenceClient for API response
     try:
-        client = InferenceClient(model="meta-llama/Llama-3.2-3B-Instruct")
+        client = InferenceClient(model="meta-llama/Llama-3.2-3B-Instruct", token=token)
         
         response = ""
         for chunk in client.chat_completion(
@@ -61,7 +78,7 @@ def respond(message, history):
         yield f"{response}\n\n⏱️ *Response time: {response_time:.2f}s*"
         
     except Exception as e:
-        yield f"Error: {str(e)}\n\nPlease try again or check your connection."
+        yield f"Error: {str(e)}\n\nPlease try logging in with Hugging Face or check your connection."
 
 
 # Create the Gradio interface using ChatInterface
@@ -74,7 +91,7 @@ demo = gr.ChatInterface(
     - ⏱️ Response time tracking
     - 🚀 Powered by Llama 3.2 3B
     
-    **Note:** This chatbot uses the Hugging Face Inference API.
+    **Note:** You need to sign in with Hugging Face to use this chatbot.
     """,
     examples=[
         "What is machine learning?",
