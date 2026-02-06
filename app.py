@@ -3,6 +3,49 @@ from huggingface_hub import InferenceClient
 import os
 import time
 
+pipe = None
+stop_inference = False
+
+# Fancy styling
+fancy_css = """
+#main-container {
+    background-color: #f0f0f0;
+    font-family: 'Arial', sans-serif;
+}
+.gradio-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+    background: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+.gr-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+.gr-button:hover {
+    background-color: #45a049;
+}
+.gr-slider input {
+    color: #4CAF50;
+}
+.gr-chat {
+    font-size: 16px;
+}
+#title {
+    text-align: center;
+    font-size: 2em;
+    margin-bottom: 20px;
+    color: #333;
+}
+"""
+
 def extract_text_from_file(file):
     """Extract text content from uploaded file"""
     if file is None:
@@ -22,84 +65,117 @@ def extract_text_from_file(file):
         return f"\n\n[Error reading file: {str(e)}]\n"
 
 
-def respond(message, history, request: gr.Request):
-    """Simple chatbot response function"""
+def respond(
+    message,
+    history: list[dict[str, str]],
+    system_message,
+    max_tokens,
+    temperature,
+    top_p,
+    file_upload,
+    hf_token: gr.OAuthToken,
+    use_local_model: bool,
+):
+    global pipe
     start_time = time.time()
     
-    # Get OAuth token from request
-    token = None
-    if request:
-        try:
-            token = request.headers.get("authorization", "").replace("Bearer ", "")
-            if not token and hasattr(request, "username"):
-                # Try to get from OAuth
-                token = request.oauth_token if hasattr(request, "oauth_token") else None
-        except:
-            pass
+    # Extract file context if provided
+    file_context = extract_text_from_file(file_upload)
     
-    # Fallback to environment variable
-    if not token:
-        token = os.getenv("HF_TOKEN")
+    # Build messages from history
+    messages = [{"role": "system", "content": system_message}]
+    messages.extend(history)
     
-    if not token:
-        yield "⚠️ Please log in with Hugging Face to use this chatbot. Click the 'Sign in with Hugging Face' button above."
-        return
+    # Add current message with file context
+    full_message = file_context + message if file_context else message
+    messages.append({"role": "user", "content": full_message})
     
-    # Build messages for API
-    messages = [{"role": "system", "content": "You are a friendly and helpful AI assistant."}]
+    response = ""
     
-    # Add history
-    for user_msg, bot_msg in history:
-        messages.append({"role": "user", "content": user_msg})
-        if bot_msg:
-            messages.append({"role": "assistant", "content": bot_msg})
-    
-    # Add current message
-    messages.append({"role": "user", "content": message})
-    
-    # Use InferenceClient for API response
-    try:
-        client = InferenceClient(model="meta-llama/Llama-3.2-3B-Instruct", token=token)
+    if use_local_model:
+        print("[MODE] local")
+        from transformers import pipeline
+        import torch
+        if pipe is None:
+            pipe = pipeline("text-generation", model="microsoft/Phi-3-mini-4k-instruct")
         
-        response = ""
+        # Build prompt as plain text
+        prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+        
+        outputs = pipe(
+            prompt,
+            max_new_tokens=max_tokens,
+            do_sample=True,
+            temperature=temperature,
+            top_p=top_p,
+        )
+        
+        response = outputs[0]["generated_text"][len(prompt):]
+        
+        # Add response time
+        end_time = time.time()
+        response_time = end_time - start_time
+        yield f"{response.strip()}\n\n⏱️ *Response time: {response_time:.2f}s*"
+    
+    else:
+        print("[MODE] api")
+        
+        if hf_token is None or not getattr(hf_token, "token", None):
+            yield "⚠️ Please log in with your Hugging Face account first."
+            return
+        
+        client = InferenceClient(token=hf_token.token, model="meta-llama/Llama-3.2-3B-Instruct")
+        
         for chunk in client.chat_completion(
             messages,
-            max_tokens=512,
+            max_tokens=max_tokens,
             stream=True,
-            temperature=0.7,
+            temperature=temperature,
+            top_p=top_p,
         ):
-            if chunk.choices and chunk.choices[0].delta.content:
-                response += chunk.choices[0].delta.content
-                yield response
+            choices = chunk.choices
+            token = ""
+            if len(choices) and choices[0].delta.content:
+                token = choices[0].delta.content
+            response += token
+            yield response
         
         # Add response time
         end_time = time.time()
         response_time = end_time - start_time
         yield f"{response}\n\n⏱️ *Response time: {response_time:.2f}s*"
-        
-    except Exception as e:
-        yield f"Error: {str(e)}\n\nPlease try logging in with Hugging Face or check your connection."
 
 
-# Create the Gradio interface using ChatInterface
-demo = gr.ChatInterface(
+chatbot = gr.ChatInterface(
     fn=respond,
-    title="🌟 Enhanced AI Chatbot 🌟",
-    description="""
+    additional_inputs=[
+        gr.Textbox(value="You are a friendly Chatbot.", label="System message"),
+        gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
+        gr.Slider(minimum=0.1, maximum=2.0, value=0.7, step=0.1, label="Temperature"),
+        gr.Slider(minimum=0.1, maximum=1.0, value=0.95, step=0.05, label="Top-p (nucleus sampling)"),
+        gr.File(
+            label="📁 Upload file for context (optional)",
+            file_types=[".txt", ".md", ".py", ".json", ".csv"]
+        ),
+        gr.Checkbox(label="Use Local Model", value=False),
+    ],
+    type="messages",
+)
+
+with gr.Blocks(css=fancy_css) as demo:
+    with gr.Row():
+        gr.Markdown("<h1 style='text-align: center;'>🌟 Fancy AI Chatbot 🌟</h1>")
+        gr.LoginButton()
+    
+    gr.Markdown("""
     ### Features:
     - 💬 Chat with AI assistant
+    - 📁 **Upload files for context** (.txt, .md, .py, .json, .csv)
     - ⏱️ Response time tracking
-    - 🚀 Powered by Llama 3.2 3B
+    - 🚀 Powered by Llama 3.2 or local Phi-3
+    """)
     
-    **Note:** You need to sign in with Hugging Face to use this chatbot.
-    """,
-    examples=[
-        "What is machine learning?",
-        "Explain Python decorators",
-        "Write a haiku about coding",
-    ],
-    cache_examples=False,
-)
+    chatbot.render()
 
 if __name__ == "__main__":
     demo.launch()
