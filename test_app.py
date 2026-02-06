@@ -102,7 +102,7 @@ def test_api_requires_token():
     hf_token = os.environ.get("HF_TOKEN")
     
     if not hf_token:
-        print("⚠️ Skipping test_api_requires_token - HF_TOKEN not set")
+        print("Skipping test_api_requires_token - HF_TOKEN not set")
         return
     
     gen = app.respond(
