@@ -2,7 +2,9 @@ import gradio as gr
 import requests
 import os
 import time
+from dotenv import load_dotenv
 
+load_dotenv()
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://paffenroth-23.dyn.wpi.edu:9008")
 
@@ -15,6 +17,7 @@ fancy_css = """
     cursor: pointer; transition: all 0.3s ease; }
 """
 
+
 def chat_via_api(
     message,
     history,
@@ -25,7 +28,7 @@ def chat_via_api(
     hf_token,
     use_local_model,
 ):
-   
+
     if not message.strip():
         yield "Please enter a message."
         return
@@ -35,7 +38,9 @@ def chat_via_api(
     if history:
         for item in history:
             if isinstance(item, dict):
-                formatted_history.append({"role": item["role"], "content": item["content"]})
+                formatted_history.append(
+                    {"role": item["role"], "content": item["content"]}
+                )
             else:
                 user_msg, bot_msg = item
                 formatted_history.append({"role": "user", "content": user_msg})
@@ -75,8 +80,6 @@ def chat_via_api(
         yield f"Unexpected error: {str(e)}"
 
 
-
-
 chatbot = gr.ChatInterface(
     fn=chat_via_api,
     additional_inputs=[
@@ -84,14 +87,20 @@ chatbot = gr.ChatInterface(
         gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
         gr.Slider(minimum=0.1, maximum=2.0, value=0.7, step=0.1, label="Temperature"),
         gr.Slider(minimum=0.1, maximum=1.0, value=0.95, step=0.05, label="Top-p"),
-        gr.Textbox(label="HF Token (for API mode)", type="password", placeholder="hf_..."),
+        gr.Textbox(
+            label="HF Token (for API mode)", type="password", placeholder="hf_..."
+        ),
         gr.Checkbox(label="Use Local Model (slower, no token needed)", value=False),
     ],
 )
 
 with gr.Blocks(css=fancy_css) as demo:
-    gr.Markdown("<h1 style='text-align:center;'>🤖 Personal Code Assistant — Group 8</h1>")
-    gr.Markdown(f"<p style='text-align:center;color:gray;'>Backend: <code>{BACKEND_URL}</code></p>")
+    gr.Markdown(
+        "<h1 style='text-align:center;'>🤖 Personal Code Assistant — Group 8</h1>"
+    )
+    gr.Markdown(
+        f"<p style='text-align:center;color:gray;'>Backend: <code>{BACKEND_URL}</code></p>"
+    )
     chatbot.render()
 
 if __name__ == "__main__":
