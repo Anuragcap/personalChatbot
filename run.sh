@@ -11,7 +11,7 @@ docker run -d \
   mlops-group8
 
 echo "Starting Grafana OTEL LGTM container..."
-docker run --name group09otel-lgtem \
+docker run --name group08otel-lgtem \
   -p 22113:3000 \
   -p 22114:4317 \
   -p 22115:4318 \

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BACKEND_URL = os.environ.get("BACKEND_URL", "http://paffenroth-23.dyn.wpi.edu:9008")
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:9008")
 
 fancy_css = """
 #main-container { background-color: #1a1a1a; font-family: 'Arial', sans-serif; min-height: 100vh; }
