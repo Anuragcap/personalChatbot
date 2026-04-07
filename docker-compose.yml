@@ -42,7 +42,7 @@ services:
     volumes:
       - ./prometheus.yml:/otel-lgtm/prometheus.yaml
     ports:
-      - "22113:3000"
+      - "22117:3000"
 
   node-exporter:
     image: prom/node-exporter

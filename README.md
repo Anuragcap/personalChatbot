@@ -32,7 +32,7 @@ Builds `Dockerfile.frontend` and `Dockerfile.backend` (if needed) and starts all
 | Frontend (Gradio) | http://localhost:22111 |
 | Backend (FastAPI) | http://localhost:22112 |
 | Backend Metrics | http://localhost:22112/metrics |
-| Grafana | http://localhost:22113 |
+| Grafana | http://localhost:22117 |
 | Node Exporter | http://localhost:22114/metrics |
 
 **Step 2 — Expose via devtunnel**
@@ -69,7 +69,7 @@ Frontend and backend run in **separate containers** connected via a Docker bridg
 |---|---|---|---|
 | `mlops-group8-frontend` | `Dockerfile.frontend` | 22111 → 7008 | mlopsgroup8 |
 | `mlops-group8-backend` | `Dockerfile.backend` | 22112 → 9008 | mlopsgroup8 |
-| `group08otel-lgtm` | `grafana/otel-lgtm` | 22113 → 3000 | mlopsgroup8 |
+| `group08otel-lgtm` | `grafana/otel-lgtm` | 22117 → 3000 | mlopsgroup8 |
 | `mlops-group8-node-exporter` | `prom/node-exporter` | 22114 (host) | host |
 
 - **`frontend.py`** — Gradio UI, listens on port `7008`. Reaches the backend via `http://backend:9008` — Docker DNS on the `mlopsgroup8` network resolves the service name `backend` to the backend container. This is set via `BACKEND_URL=http://backend:9008` in `docker-compose.yml`.
