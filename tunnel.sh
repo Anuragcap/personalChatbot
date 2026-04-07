@@ -20,10 +20,10 @@ if "$DEVTUNNEL" show "$TUNNEL_NAME" > /dev/null 2>&1; then
   echo "Tunnel already exists: $TUNNEL_NAME"
 else
   echo "Creating tunnel: $TUNNEL_NAME"
-  "$DEVTUNNEL" create --name "$TUNNEL_NAME"
+  "$DEVTUNNEL" create "$TUNNEL_NAME"
   "$DEVTUNNEL" port create "$TUNNEL_NAME" -p 22111
   "$DEVTUNNEL" port create "$TUNNEL_NAME" -p 22112
-  "$DEVTUNNEL" port create "$TUNNEL_NAME" -p 22113
+  "$DEVTUNNEL" port create "$TUNNEL_NAME" -p 22116
 fi
 
 echo ""

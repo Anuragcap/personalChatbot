@@ -192,4 +192,4 @@ def chat(request: ChatRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("api_backend:app", host="0.0.0.0", port=9008, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=9008, reload=False)

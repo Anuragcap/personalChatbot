@@ -54,4 +54,4 @@ services:
       - /:/host:ro,rslave
     command:
       - --path.rootfs=/host
-      - --web.listen-address=:22114
+      - --web.listen-address=:22116
