@@ -9,6 +9,12 @@ if [ ! -f "$DEVTUNNEL" ]; then
   exit 1
 fi
 
+# Ensure services are up
+if ! docker compose ps --services --filter "status=running" 2>/dev/null | grep -q app; then
+  echo "Services are not running. Starting them first..."
+  docker compose up -d --build
+fi
+
 # Check if a tunnel with this name already exists
 echo "Checking for existing tunnel: $TUNNEL_NAME"
 TUNNEL_ID=$("$DEVTUNNEL" list 2>/dev/null | grep "$TUNNEL_NAME" | awk '{print $1}')

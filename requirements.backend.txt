@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+prometheus-client
+huggingface_hub
+transformers
+torch
+python-dotenv

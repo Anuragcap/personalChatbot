@@ -1,0 +1,53 @@
+networks:
+  mlopsgroup8:
+    driver: bridge
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: mlops-group8-frontend
+    env_file: .env
+    environment:
+      - BACKEND_URL=http://backend:9008
+    networks:
+      - mlopsgroup8
+    ports:
+      - "22111:7008"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: mlops-group8-backend
+    env_file: .env
+    networks:
+      - mlopsgroup8
+    ports:
+      - "22112:9008"
+
+  grafana:
+    image: grafana/otel-lgtm
+    container_name: group08otel-lgtm
+    networks:
+      - mlopsgroup8
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./prometheus.yml:/otel-lgtm/prometheus.yaml
+    ports:
+      - "22113:3000"
+
+  node-exporter:
+    image: prom/node-exporter
+    container_name: mlops-group8-node-exporter
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=:22114
