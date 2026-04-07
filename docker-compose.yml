@@ -8,6 +8,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: mlops-group8-frontend
+    restart: always
     env_file: .env
     environment:
       - BACKEND_URL=http://backend:9008
@@ -23,6 +24,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: mlops-group8-backend
+    restart: always
     env_file: .env
     networks:
       - mlopsgroup8
@@ -32,6 +34,7 @@ services:
   grafana:
     image: grafana/otel-lgtm
     container_name: group08otel-lgtm
+    restart: always
     networks:
       - mlopsgroup8
     extra_hosts:
@@ -44,6 +47,7 @@ services:
   node-exporter:
     image: prom/node-exporter
     container_name: mlops-group8-node-exporter
+    restart: always
     network_mode: host
     pid: host
     volumes:
