@@ -7,8 +7,10 @@ import time
 import os
 from dotenv import load_dotenv
 from prometheus_client import (
-    Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+    Counter, Histogram, Gauge, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST
 )
+
+METRICS_REGISTRY = CollectorRegistry()
 
 load_dotenv()
 
@@ -17,30 +19,36 @@ chat_requests_total = Counter(
     "chatbot_requests_total",
     "Total number of chat requests",
     ["status", "model_type"],
+    registry=METRICS_REGISTRY,
 )
 chat_errors_total = Counter(
     "chatbot_errors_total",
     "Total number of chat errors by type",
     ["error_type"],
+    registry=METRICS_REGISTRY,
 )
 chat_response_time_seconds = Histogram(
     "chatbot_response_time_seconds",
     "Time taken to generate a chat response",
     buckets=[0.5, 1, 2, 5, 10, 30, 60, 120],
+    registry=METRICS_REGISTRY,
 )
 chat_active_requests = Gauge(
     "chatbot_active_requests",
     "Number of chat requests currently being processed",
+    registry=METRICS_REGISTRY,
 )
 chat_tokens_requested = Histogram(
     "chatbot_tokens_requested",
     "Distribution of max_tokens requested per chat",
     buckets=[64, 128, 256, 512, 1024, 2048],
+    registry=METRICS_REGISTRY,
 )
 chat_history_length = Histogram(
     "chatbot_history_length",
     "Number of prior messages in history per request",
     buckets=[0, 1, 2, 5, 10, 20, 50],
+    registry=METRICS_REGISTRY,
 )
 # --------------------------
 
@@ -106,7 +114,7 @@ def health():
 @app.get("/metrics")
 def metrics():
     """Prometheus metrics endpoint."""
-    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    return Response(content=generate_latest(METRICS_REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/download-model", summary="Pre-download the local model to cache")
