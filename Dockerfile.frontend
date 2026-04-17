@@ -1,0 +1,12 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.frontend.txt .
+RUN pip install --no-cache-dir -r requirements.frontend.txt
+
+COPY frontend.py .
+
+EXPOSE 7008
+
+CMD ["python", "frontend.py"]

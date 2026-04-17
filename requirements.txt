@@ -4,4 +4,7 @@ torch
 huggingface_hub
 itsdangerous
 requests
-dotenv
+python-dotenv
+fastapi
+uvicorn
+prometheus-client

@@ -1,0 +1,4 @@
+gradio[oauth]
+requests
+itsdangerous
+python-dotenv
