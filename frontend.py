@@ -38,9 +38,12 @@ def chat_via_api(
     if history:
         for item in history:
             if isinstance(item, dict):
-                formatted_history.append(
-                    {"role": item["role"], "content": item["content"]}
-                )
+                content = item["content"]
+                if isinstance(content, list):
+                    content = " ".join(
+                        c.get("text", "") for c in content if isinstance(c, dict)
+                    )
+                formatted_history.append({"role": item["role"], "content": content})
             else:
                 user_msg, bot_msg = item
                 formatted_history.append({"role": "user", "content": user_msg})

@@ -22,7 +22,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_ID = "Qwen/QwQ-32B"
+MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
+LOCAL_MODEL_ID = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
 
 class ChatMessage(BaseModel):
@@ -65,6 +66,19 @@ def health():
     return HealthResponse(status="ok", backend_port=9008, timestamp=time.time())
 
 
+@app.post("/download-model", summary="Pre-download the local model to cache")
+def download_model():
+    """Download and cache the local model so inference starts immediately."""
+    try:
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        AutoTokenizer.from_pretrained(LOCAL_MODEL_ID)
+        AutoModelForCausalLM.from_pretrained(LOCAL_MODEL_ID)
+        return {"status": "ok", "model": LOCAL_MODEL_ID, "message": "Model cached successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
 
@@ -83,9 +97,15 @@ def chat(request: ChatRequest):
         try:
             from transformers import pipeline
 
-            model_used = "microsoft/Phi-3-mini-4k-instruct (local)"
-            pipe = pipeline("text-generation", model="microsoft/Phi-3-mini-4k-instruct")
-            prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+            model_used = f"{LOCAL_MODEL_ID} (local)"
+            pipe = pipeline(
+                "text-generation",
+                model=LOCAL_MODEL_ID,
+            )
+            # Use the model's chat template for proper formatting
+            prompt = pipe.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
             outputs = pipe(
                 prompt,
                 max_new_tokens=request.max_tokens,
@@ -109,7 +129,7 @@ def chat(request: ChatRequest):
             from huggingface_hub import InferenceClient
 
             model_used = f"{MODEL_ID} (API)"
-            client = InferenceClient(token=hf_token, model=MODEL_ID)
+            client = InferenceClient(token=hf_token,provider='cerebras', model=MODEL_ID)
             result = client.chat_completion(
                 messages,
                 max_tokens=request.max_tokens,
@@ -130,6 +150,14 @@ def chat(request: ChatRequest):
 
 
 if __name__ == "__main__":
+    import sys
     import uvicorn
 
-    uvicorn.run("api_backend:app", host="0.0.0.0", port=9008, reload=False)
+    if "--download-model" in sys.argv:
+        print(f"Downloading {LOCAL_MODEL_ID} to local cache...")
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        AutoTokenizer.from_pretrained(LOCAL_MODEL_ID)
+        AutoModelForCausalLM.from_pretrained(LOCAL_MODEL_ID)
+        print("Done. Model is cached and ready.")
+    else:
+        uvicorn.run("api_backend:app", host="0.0.0.0", port=9008, reload=False)
