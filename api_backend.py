@@ -125,7 +125,12 @@ def download_model():
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
 
+    chat_active_requests.inc()
+    chat_tokens_requested.observe(request.max_tokens)
+    chat_history_length.observe(len(request.history))
+
     start_time = time.time()
+    model_type = "local" if request.use_local_model else "api"
 
     messages = [{"role": "system", "content": request.system_message}]
     for msg in request.history:
@@ -135,61 +140,75 @@ def chat(request: ChatRequest):
     response_text = ""
     model_used = ""
 
-    if request.use_local_model:
+    try:
+        if request.use_local_model:
 
-        try:
-            from transformers import pipeline
+            try:
+                from transformers import pipeline
 
-            model_used = f"{LOCAL_MODEL_ID} (local)"
-            pipe = pipeline(
-                "text-generation",
-                model=LOCAL_MODEL_ID,
-            )
-            # Use the model's chat template for proper formatting
-            prompt = pipe.tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-            outputs = pipe(
-                prompt,
-                max_new_tokens=request.max_tokens,
-                do_sample=True,
-                temperature=request.temperature,
-                top_p=request.top_p,
-            )
-            response_text = outputs[0]["generated_text"][len(prompt) :].strip()
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Local model error: {str(e)}")
+                model_used = f"{LOCAL_MODEL_ID} (local)"
+                pipe = pipeline(
+                    "text-generation",
+                    model=LOCAL_MODEL_ID,
+                )
+                # Use the model's chat template for proper formatting
+                prompt = pipe.tokenizer.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+                outputs = pipe(
+                    prompt,
+                    max_new_tokens=request.max_tokens,
+                    do_sample=True,
+                    temperature=request.temperature,
+                    top_p=request.top_p,
+                )
+                response_text = outputs[0]["generated_text"][len(prompt) :].strip()
+            except Exception as e:
+                chat_errors_total.labels(error_type="local_model_error").inc()
+                chat_requests_total.labels(status="error", model_type=model_type).inc()
+                raise HTTPException(status_code=500, detail=f"Local model error: {str(e)}")
 
-    else:
+        else:
 
-        hf_token = request.hf_token or os.environ.get("HF_TOKEN")
-        if not hf_token:
-            raise HTTPException(
-                status_code=401,
-                detail="No HF token provided. Pass hf_token in the request or set HF_TOKEN env var.",
-            )
-        try:
-            from huggingface_hub import InferenceClient
+            hf_token = request.hf_token or os.environ.get("HF_TOKEN")
+            if not hf_token:
+                chat_errors_total.labels(error_type="auth_error").inc()
+                chat_requests_total.labels(status="error", model_type=model_type).inc()
+                raise HTTPException(
+                    status_code=401,
+                    detail="No HF token provided. Pass hf_token in the request or set HF_TOKEN env var.",
+                )
+            try:
+                from huggingface_hub import InferenceClient
 
-            model_used = f"{MODEL_ID} (API)"
-            client = InferenceClient(token=hf_token,provider='cerebras', model=MODEL_ID)
-            result = client.chat_completion(
-                messages,
-                max_tokens=request.max_tokens,
-                stream=False,
-                temperature=request.temperature,
-                top_p=request.top_p,
-            )
-            response_text = result.choices[0].message.content
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"HF API error: {str(e)}")
+                model_used = f"{MODEL_ID} (API)"
+                client = InferenceClient(token=hf_token, provider='cerebras', model=MODEL_ID)
+                result = client.chat_completion(
+                    messages,
+                    max_tokens=request.max_tokens,
+                    stream=False,
+                    temperature=request.temperature,
+                    top_p=request.top_p,
+                )
+                response_text = result.choices[0].message.content
+            except HTTPException:
+                raise
+            except Exception as e:
+                chat_errors_total.labels(error_type="hf_api_error").inc()
+                chat_requests_total.labels(status="error", model_type=model_type).inc()
+                raise HTTPException(status_code=500, detail=f"HF API error: {str(e)}")
 
-    end_time = time.time()
-    return ChatResponse(
-        response=response_text,
-        response_time=round(end_time - start_time, 2),
-        model_used=model_used,
-    )
+        elapsed = time.time() - start_time
+        chat_response_time_seconds.observe(elapsed)
+        chat_requests_total.labels(status="success", model_type=model_type).inc()
+
+        return ChatResponse(
+            response=response_text,
+            response_time=round(elapsed, 2),
+            model_used=model_used,
+        )
+    finally:
+        chat_active_requests.dec()
 
 
 if __name__ == "__main__":
