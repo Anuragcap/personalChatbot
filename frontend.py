@@ -104,4 +104,5 @@ with gr.Blocks(css=fancy_css) as demo:
     chatbot.render()
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7008)
+    port = int(os.environ.get("PORT", 7008))
+    demo.launch(server_name="0.0.0.0", server_port=port)
