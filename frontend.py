@@ -36,10 +36,14 @@ def chat_via_api(
     # Convert Gradio history format to API format
     formatted_history = []
     if history:
+
         for item in history:
             if isinstance(item, dict):
+                content = item["content"]
+                if isinstance(content, list):
+                    content = " ".join([c.get("text", "") for c in content if isinstance(c, dict)])
                 formatted_history.append(
-                    {"role": item["role"], "content": item["content"]}
+                    {"role": item["role"], "content": content}
                 )
             else:
                 user_msg, bot_msg = item
